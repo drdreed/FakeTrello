@@ -17,6 +17,8 @@ namespace FakeTrello.Tests.DAL
         public Mock<DbSet<Board>> mock_boards_set { get; set; }
         public IQueryable<Board> query_boards { get; set; }
         public List<Board> fake_board_table { get; set; }
+        public ApplicationUser sally { get; set; }
+        public ApplicationUser sammy { get; set; }
 
         [TestInitialize]
         public void Setup()
@@ -25,6 +27,9 @@ namespace FakeTrello.Tests.DAL
             fake_context = new Mock<FakeTrelloContext>();
             mock_boards_set = new Mock<DbSet<Board>>();
             repo = new FakeTrelloRepository(fake_context.Object);
+
+            sally = new ApplicationUser { Id = "sally-id-1" };
+            sammy = new ApplicationUser { Id = "sammy-id-1" };
         }
 
         public void CreateFakeDatabase()
@@ -38,6 +43,7 @@ namespace FakeTrello.Tests.DAL
             mock_boards_set.As<IQueryable<Board>>().Setup(b => b.GetEnumerator()).Returns(() => query_boards.GetEnumerator());
 
             mock_boards_set.Setup(b => b.Add(It.IsAny<Board>())).Callback((Board board) => fake_board_table.Add(board));
+            mock_boards_set.Setup(b => b.Remove(It.IsAny<Board>())).Callback((Board board) => fake_board_table.Remove(board));
             fake_context.Setup(c => c.Boards).Returns(mock_boards_set.Object); // Context.Boards returns fake_board_table (a list)
         }
 
@@ -115,6 +121,37 @@ namespace FakeTrello.Tests.DAL
             // Assert
             Assert.IsNotNull(actual_board);
             Assert.AreEqual(expected_board_name, actual_board_name);
+        }
+
+        [TestMethod]
+        public void EnsureICanGetUserBoards()
+        {
+            
+            fake_board_table.Add(new Board { BoardId = 1, Name = "My Board", Owner = sally });
+            fake_board_table.Add(new Board { BoardId = 2, Name = "My Board", Owner = sally });
+            fake_board_table.Add(new Board { BoardId = 3, Name = "My Board", Owner = sammy });
+            CreateFakeDatabase();
+
+            int expected_board_count = 2;
+            int actual_board_count = repo.GetBoardsFromUser(sally.Id).Count;
+
+            Assert.AreEqual(expected_board_count, actual_board_count);
+
+        }
+
+        [TestMethod]
+        public void EnsureICanRemoveBoard()
+        {
+            fake_board_table.Add(new Board { BoardId = 1, Name = "My Board", Owner = sally });
+            fake_board_table.Add(new Board { BoardId = 2, Name = "My Board", Owner = sally });
+            fake_board_table.Add(new Board { BoardId = 3, Name = "My Board", Owner = sammy });
+            CreateFakeDatabase();
+
+            int expected_board_count = 2;
+            repo.RemoveBoard(3);
+            int actual_board_count = repo.Context.Boards.Count();
+
+            Assert.AreEqual(expected_board_count, actual_board_count);
         }
     }
 }
